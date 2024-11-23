@@ -142,7 +142,7 @@ function App() {
       setError(null);
       setResult(null);
 
-      const response = await axios.post(`${API_URL}/downloader/download/`, {
+      const response = await axios.post(`${API_URL}/download`, {
         url: videoUrl,
         format: format,
         quality: quality,
