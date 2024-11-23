@@ -12,8 +12,8 @@ const API_URL = (process.env.REACT_APP_API_URL || 'http://localhost:8000').repla
 
 function App() {
   const [videoUrl, setVideoUrl] = useState("");
-  const [format, setFormat] = useState("video");
-  const [quality, setQuality] = useState("1080");
+  const [format, setFormat] = useState("mp4");
+  const [quality, setQuality] = useState("highest");
   const [statusMessage, setStatusMessage] = useState("");
   const [player, setPlayer] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -153,7 +153,7 @@ function App() {
       const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = blobUrl;
-      link.setAttribute("download", `video.${format === "video" ? "mp4" : "mp3"}`);
+      link.setAttribute("download", `video.${format}`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -226,8 +226,8 @@ function App() {
                         onChange={(e) => setFormat(e.target.value)}
                         className="w-full border rounded px-3 py-2"
                       >
-                        <option value="video">Video</option>
-                        <option value="audio">Audio</option>
+                        <option value="mp4">Video (MP4)</option>
+                        <option value="mp3">Audio (MP3)</option>
                       </select>
                     </div>
 
@@ -238,12 +238,8 @@ function App() {
                         onChange={(e) => setQuality(e.target.value)}
                         className="w-full border rounded px-3 py-2"
                       >
-                        <option value="1080">1080p</option>
-                        <option value="720">720p</option>
-                        <option value="480">480p</option>
-                        <option value="360">360p</option>
-                        <option value="240">240p</option>
-                        <option value="144">144p</option>
+                        <option value="highest">Highest Quality</option>
+                        <option value="lowest">Lowest Quality</option>
                       </select>
                     </div>
 
