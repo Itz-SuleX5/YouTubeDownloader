@@ -1,0 +1,24 @@
+services:
+  # Backend Service
+  - type: web
+    name: youtube-downloader-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: cd youtube_downloader && uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.0
+      - key: PORT
+        value: 8000
+
+  # Frontend Service
+  - type: web
+    name: youtube-downloader-frontend
+    env: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/build
+    envVars:
+      - key: NODE_VERSION
+        value: 16.x
+      - key: REACT_APP_API_URL
+        value: https://youtube-downloader-api.onrender.com
