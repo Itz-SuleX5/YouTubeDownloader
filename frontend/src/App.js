@@ -7,6 +7,7 @@ import {
 
 import "./index.css";
 
+// Obtener la URL de la API desde las variables de entorno o usar un valor por defecto
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 function App() {
