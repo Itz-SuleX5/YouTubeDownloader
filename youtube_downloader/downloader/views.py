@@ -1,7 +1,7 @@
 # downloader/views.py
 from django.shortcuts import render
 from django.http import JsonResponse, FileResponse
-import yt_dlp
+from pytube import YouTube
 import os
 from django.views.decorators.csrf import csrf_exempt
 import json
@@ -25,8 +25,6 @@ def download_video(request):
     try:
         data = json.loads(request.body)
         video_url = data.get('url')
-        format_type = data.get('format', 'mp4')
-        quality = data.get('quality', 'highest')
 
         if not video_url:
             return JsonResponse({'status': 'error', 'message': 'URL not provided'}, status=400)
@@ -34,43 +32,25 @@ def download_video(request):
         # Crear un directorio temporal
         with tempfile.TemporaryDirectory() as temp_dir:
             try:
-                # Configurar las opciones de descarga según el formato y calidad
-                ydl_opts = {
-                    'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best' if format_type == 'mp4' else 'bestaudio[ext=mp3]/best',
-                    'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
-                    'quiet': True,
-                    'no_warnings': True,
-                }
-
-                # Si es audio, convertir a MP3
-                if format_type == 'mp3':
-                    ydl_opts.update({
-                        'postprocessors': [{
-                            'key': 'FFmpegExtractAudio',
-                            'preferredcodec': 'mp3',
-                            'preferredquality': '192',
-                        }],
-                    })
-
+                # Crear objeto YouTube
+                yt = YouTube(video_url)
+                
+                # Obtener el stream con la mejor resolución
+                video = yt.streams.get_highest_resolution()
+                
                 # Descargar el video
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(video_url, download=True)
-                    video_title = ydl.prepare_filename(info)
-                    
-                    # Ajustar la extensión si es MP3
-                    if format_type == 'mp3':
-                        video_title = str(Path(video_title).with_suffix('.mp3'))
-
-                    if os.path.exists(video_title):
-                        # Abrir y enviar el archivo
-                        response = FileResponse(
-                            open(video_title, 'rb'),
-                            as_attachment=True,
-                            filename=os.path.basename(video_title)
-                        )
-                        return response
-                    else:
-                        return JsonResponse({'status': 'error', 'message': 'File not found after download'}, status=404)
+                video_path = video.download(output_path=temp_dir)
+                
+                if os.path.exists(video_path):
+                    # Abrir y enviar el archivo
+                    response = FileResponse(
+                        open(video_path, 'rb'),
+                        as_attachment=True,
+                        filename=os.path.basename(video_path)
+                    )
+                    return response
+                else:
+                    return JsonResponse({'status': 'error', 'message': 'File not found after download'}, status=404)
 
             except Exception as e:
                 print(f"Download error: {str(e)}")  # Agregar logging
