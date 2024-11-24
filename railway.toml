@@ -1,10 +1,10 @@
 [build]
 builder = "nixpacks"
-buildCommand = """
-apt-get update && \
-apt-get install -y ffmpeg && \
-pip install -r requirements.txt
-"""
+
+[variables]
+NIXPACKS_PKGS = "ffmpeg"
+DJANGO_SETTINGS_MODULE = "youtube_downloader.settings"
+PYTHONUNBUFFERED = "1"
 
 [deploy]
 startCommand = "cd youtube_downloader && gunicorn youtube_downloader.wsgi:application --bind 0.0.0.0:$PORT"
@@ -15,7 +15,3 @@ restartPolicyMaxRetries = 10
 name = "web"
 protocol = "tcp"
 internal_port = "$PORT"
-
-[variables]
-DJANGO_SETTINGS_MODULE = "youtube_downloader.settings"
-PYTHONUNBUFFERED = "1"
