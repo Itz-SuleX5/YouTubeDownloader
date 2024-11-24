@@ -1,0 +1,17 @@
+[build]
+builder = "nixpacks"
+buildCommand = "pip install -r requirements.txt"
+
+[deploy]
+startCommand = "cd youtube_downloader && gunicorn youtube_downloader.wsgi:application --bind 0.0.0.0:$PORT"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+[[services]]
+name = "web"
+protocol = "tcp"
+internal_port = "$PORT"
+
+[variables]
+DJANGO_SETTINGS_MODULE = "youtube_downloader.settings"
+PYTHONUNBUFFERED = "1"
