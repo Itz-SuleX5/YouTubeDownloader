@@ -1,7 +1,7 @@
 # downloader/views.py
 from django.shortcuts import render
 from django.http import JsonResponse, FileResponse
-from pytube import YouTube
+import yt_dlp
 import os
 from django.views.decorators.csrf import csrf_exempt
 import json
@@ -68,72 +68,45 @@ def download_video(request):
         # Crear un directorio temporal
         with tempfile.TemporaryDirectory() as temp_dir:
             try:
-                # Obtener headers y cookies realistas
-                browser_data = get_youtube_page(video_url)
+                # Configurar opciones de yt-dlp
+                ydl_opts = {
+                    'format': 'best[ext=mp4]',  # Mejor calidad disponible en MP4
+                    'outtmpl': os.path.join(temp_dir, 'video.%(ext)s'),
+                    'quiet': True,
+                    'no_warnings': True,
+                    'extract_flat': True,
+                    'nocheckcertificate': True,
+                    # Headers personalizados para evitar bloqueos
+                    'http_headers': {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                        'Accept-Language': 'en-us,en;q=0.5',
+                        'Sec-Fetch-Mode': 'navigate'
+                    }
+                }
+
+                # Descargar el video
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    print("Iniciando descarga...")
+                    ydl.download([video_url])
                 
-                # Crear objeto YouTube con configuración mejorada
-                yt = YouTube(
-                    url=video_url,
-                    use_oauth=False,
-                    allow_oauth_cache=True
-                )
+                # Buscar el archivo descargado
+                downloaded_files = os.listdir(temp_dir)
+                if not downloaded_files:
+                    return JsonResponse({'status': 'error', 'message': 'No file was downloaded'}, status=500)
                 
-                # Configurar headers y cookies
-                yt.headers = browser_data['headers']
-                yt._http.cookies.update(browser_data['cookies'])
+                video_file = os.path.join(temp_dir, downloaded_files[0])
                 
-                # Agregar un pequeño delay para simular comportamiento humano
-                time.sleep(random.uniform(1, 2))
-                
-                try:
-                    # Intentar obtener streams con retry
-                    max_retries = 3
-                    for attempt in range(max_retries):
-                        try:
-                            streams = yt.streams.filter(progressive=True, file_extension='mp4')
-                            if streams:
-                                break
-                            time.sleep(random.uniform(1, 2))
-                        except Exception as e:
-                            if attempt == max_retries - 1:
-                                raise e
-                            time.sleep(random.uniform(1, 2))
-                    
-                    if not streams:
-                        return JsonResponse({'status': 'error', 'message': 'No suitable video stream found'}, status=404)
-                    
-                    video = streams.first()
-                    if not video:
-                        return JsonResponse({'status': 'error', 'message': 'No video stream available'}, status=404)
-                    
-                    # Generar nombre de archivo
-                    output_filename = f"video_{random.randint(1000, 9999)}.mp4"
-                    output_path = os.path.join(temp_dir, output_filename)
-                    
-                    # Descargar con retry
-                    max_download_retries = 3
-                    for attempt in range(max_download_retries):
-                        try:
-                            video.download(output_path=temp_dir, filename=output_filename)
-                            break
-                        except Exception as e:
-                            if attempt == max_download_retries - 1:
-                                raise e
-                            time.sleep(random.uniform(1, 2))
-                    
-                    if os.path.exists(output_path):
-                        response = FileResponse(
-                            open(output_path, 'rb'),
-                            as_attachment=True,
-                            filename=output_filename
-                        )
-                        return response
-                    else:
-                        return JsonResponse({'status': 'error', 'message': 'File not found after download'}, status=404)
-                
-                except Exception as e:
-                    print(f"Stream error: {str(e)}")
-                    return JsonResponse({'status': 'error', 'message': f'Error accessing video streams: {str(e)}'}, status=500)
+                if os.path.exists(video_file):
+                    print(f"Archivo descargado: {video_file}")
+                    response = FileResponse(
+                        open(video_file, 'rb'),
+                        as_attachment=True,
+                        filename=f"video_{random.randint(1000, 9999)}.mp4"
+                    )
+                    return response
+                else:
+                    return JsonResponse({'status': 'error', 'message': 'File not found after download'}, status=404)
 
             except Exception as e:
                 print(f"Download error: {str(e)}")
