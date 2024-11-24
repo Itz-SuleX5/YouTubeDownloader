@@ -10,10 +10,6 @@ import tempfile
 import shutil
 import random
 
-# Crear un directorio temporal para las descargas
-DOWNLOAD_DIR = Path(__file__).parent.parent / 'temp'
-DOWNLOAD_DIR.mkdir(exist_ok=True)
-
 # Lista de user agents comunes
 USER_AGENTS = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
@@ -52,48 +48,55 @@ def download_video(request):
                     'Connection': 'keep-alive',
                 }
                 
-                # Crear objeto YouTube con las opciones personalizadas
+                # Crear objeto YouTube sin callbacks ni extracciones innecesarias
                 yt = YouTube(
                     video_url,
                     use_oauth=False,
-                    allow_oauth_cache=True,
-                    on_progress_callback=lambda stream, chunk, bytes_remaining: print(f"Downloading... {(1 - bytes_remaining/stream.filesize)*100}%")
+                    allow_oauth_cache=True
                 )
                 
                 # Configurar el user agent
                 yt.headers = headers
                 
-                print(f"Video title: {yt.title}")
-                print(f"Available streams: {[stream.resolution for stream in yt.streams.filter(progressive=True)]}")
+                try:
+                    # Intentar obtener streams directamente sin acceder al título
+                    streams = yt.streams.filter(progressive=True, file_extension='mp4')
+                    if not streams:
+                        return JsonResponse({'status': 'error', 'message': 'No suitable video stream found'}, status=404)
+                    
+                    # Obtener el primer stream disponible
+                    video = streams.first()
+                    if not video:
+                        return JsonResponse({'status': 'error', 'message': 'No video stream available'}, status=404)
+                    
+                    # Generar un nombre de archivo temporal
+                    output_filename = f"video_{random.randint(1000, 9999)}.mp4"
+                    output_path = os.path.join(temp_dir, output_filename)
+                    
+                    # Descargar el video
+                    video.download(output_path=temp_dir, filename=output_filename)
+                    
+                    if os.path.exists(output_path):
+                        # Abrir y enviar el archivo
+                        response = FileResponse(
+                            open(output_path, 'rb'),
+                            as_attachment=True,
+                            filename=output_filename
+                        )
+                        return response
+                    else:
+                        return JsonResponse({'status': 'error', 'message': 'File not found after download'}, status=404)
                 
-                # Obtener el stream con la mejor resolución (progressive=True para obtener video+audio juntos)
-                video = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
-                
-                if not video:
-                    return JsonResponse({'status': 'error', 'message': 'No suitable video stream found'}, status=404)
-                
-                print(f"Selected stream: {video.resolution}")
-                
-                # Descargar el video
-                video_path = video.download(output_path=temp_dir)
-                
-                if os.path.exists(video_path):
-                    # Abrir y enviar el archivo
-                    response = FileResponse(
-                        open(video_path, 'rb'),
-                        as_attachment=True,
-                        filename=os.path.basename(video_path)
-                    )
-                    return response
-                else:
-                    return JsonResponse({'status': 'error', 'message': 'File not found after download'}, status=404)
+                except Exception as e:
+                    print(f"Stream error: {str(e)}")
+                    return JsonResponse({'status': 'error', 'message': 'Error accessing video streams'}, status=500)
 
             except Exception as e:
-                print(f"Download error: {str(e)}")  # Agregar logging
+                print(f"Download error: {str(e)}")
                 return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
     except json.JSONDecodeError:
         return JsonResponse({'status': 'error', 'message': 'Invalid JSON data'}, status=400)
     except Exception as e:
-        print(f"General error: {str(e)}")  # Agregar logging
+        print(f"General error: {str(e)}")
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
