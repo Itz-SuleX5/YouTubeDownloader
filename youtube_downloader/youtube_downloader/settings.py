@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-s##d(!a95no*ytp4e42*f#7i*kz4=qf#xi*@h2k^8k_2&iwunj
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = ['youtubedownloader-production.up.railway.app', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['youtubedownloader-production-7814.up.railway.app', 'localhost', '127.0.0.1']
 
 
 # Application definition
@@ -123,7 +123,7 @@ STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # CORS settings
-CORS_ALLOW_ALL_ORIGINS = True  # Solo para desarrollo, cambiar en producción
+CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "https://youtubedownloader-frontend.onrender.com",
