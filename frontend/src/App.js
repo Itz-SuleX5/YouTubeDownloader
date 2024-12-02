@@ -45,89 +45,123 @@ function App() {
       delete window.youtubePlayer;
     };
   }, []);
-  
-  // Handle player initialization when URL changes
+
   useEffect(() => {
-    if (!videoUrl) return;
-    
-    const videoId = extractVideoId(videoUrl);
-    if (!videoId) return;
-
-    let timeoutId = null;
-
-    // If we have an existing player, just load the new video
-    if (player) {
-      try {
-        player.cueVideoById(videoId);
-        return;
-      } catch (error) {
-        console.error("Error loading video:", error);
-        // If loading fails, we'll create a new player below
+    if (videoUrl) {
+      if (player) {
+        player.destroy();
       }
-    }
+      const videoId = extractVideoId(videoUrl);
+      if (!videoId) return;
 
-    const initializePlayer = () => {
-      if (!window.YT || !window.YT.Player) {
-        // If API is not ready yet, wait for it
-        timeoutId = setTimeout(initializePlayer, 100);
-        return;
-      }
+      let timeoutId = null;
 
-      try {
-        console.log("Creating new YouTube player...");
-        // Clean up existing player if any
-        if (player) {
-          player.destroy();
-          setPlayer(null);
+      const initializePlayer = () => {
+        if (!window.YT || !window.YT.Player) {
+          timeoutId = setTimeout(initializePlayer, 100);
+          return;
         }
-        // Create new player instance
-        const newPlayer = new window.YT.Player("youtube-player", {
-          videoId: videoId,
-          width: "100%",
-          height: "100%",
-          playerVars: {
-            autoplay: 0,
-            controls: 1,
-            modestbranding: 1,
-          },
-          events: {
-            onReady: (event) => {
-              console.log("Player ready with video");
-              setPlayer(event.target);
+
+        try {
+          console.log("Creating new YouTube player...");
+          const newPlayer = new window.YT.Player("youtube-player", {
+            videoId: videoId,
+            width: "100%",
+            height: "100%",
+            playerVars: {
+              autoplay: 0,
+              controls: 1,
+              modestbranding: 1,
             },
-            onError: (error) => {
-              console.error("YouTube player error:", error);
+            events: {
+              onReady: (event) => {
+                console.log("Player ready with video");
+                setPlayer(event.target);
+              },
+              onError: (error) => {
+                console.error("YouTube player error:", error);
+              }
             }
-          }
-        });
-      } catch (error) {
-        console.error("Error creating YouTube player:", error);
-        // If creation fails, try again after a delay
-        timeoutId = setTimeout(initializePlayer, 100);
-      }
-    };
+          });
+        } catch (error) {
+          console.error("Error creating YouTube player:", error);
+          timeoutId = setTimeout(initializePlayer, 100);
+        }
+      };
 
-    // Start initialization process
-    initializePlayer();
+      initializePlayer();
 
-    // Cleanup function
-    return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-    };
-  }, [videoUrl]); // Only depend on videoUrl, not player
+      return () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+      };
+    }
+  }, [videoUrl, player]);
 
-  const extractVideoId = (url) => {
-    // Regular expression to extract YouTube video ID from various URL formats
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[2].length === 11) ? match[2] : null;
-  };
-
-  const handleUrlChange = (e) => {
+  const handleVideoUrlChange = (e) => {
     const url = e.target.value;
     setVideoUrl(url);
+    
+    if (player) {
+      player.destroy();
+    }
+    
+    if (url) {
+      const videoId = extractVideoId(url);
+      if (videoId) {
+        const initializePlayer = () => {
+          if (!window.YT || !window.YT.Player) {
+            setTimeout(initializePlayer, 100);
+            return;
+          }
+
+          try {
+            console.log("Creating new YouTube player...");
+            const newPlayer = new window.YT.Player("youtube-player", {
+              videoId: videoId,
+              width: "100%",
+              height: "100%",
+              playerVars: {
+                autoplay: 0,
+                controls: 1,
+                modestbranding: 1,
+              },
+              events: {
+                onReady: (event) => {
+                  console.log("Player ready with video");
+                  setPlayer(event.target);
+                },
+                onError: (error) => {
+                  console.error("YouTube player error:", error);
+                }
+              }
+            });
+          } catch (error) {
+            console.error("Error creating YouTube player:", error);
+            setTimeout(initializePlayer, 100);
+          }
+        };
+
+        initializePlayer();
+      }
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (player) {
+        player.destroy();
+      }
+    };
+  }, [player]);
+
+  const extractVideoId = (url) => {
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu.be\/|youtube.com\/embed\/)([^&?]+)/,
+    ];
+    const match = patterns.find((pattern) => pattern.test(url));
+    return match && match[1].length === 11 ? match[1] : null;
   };
 
   const handleDownload = async () => {
@@ -205,7 +239,7 @@ function App() {
                         type="text"
                         placeholder="Enter YouTube URL here"
                         value={videoUrl}
-                        onChange={handleUrlChange}
+                        onChange={handleVideoUrlChange}
                         className="w-full pl-10 pr-10 py-2 text-lg border rounded"
                       />
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
