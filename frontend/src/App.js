@@ -17,137 +17,64 @@ function App() {
   const [statusMessage, setStatusMessage] = useState("");
   const [player, setPlayer] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
 
+  // Cargar la API de YouTube
   useEffect(() => {
-    let script;
-    if (!window.YT) {
-      script = document.createElement("script");
-      script.src = "https://www.youtube.com/iframe_api";
-      
-      window.onYouTubeIframeAPIReady = () => {
-        console.log("YouTube API is ready");
-        window.YT_API_READY = true;
-      };
-      
-      document.body.appendChild(script);
-    }
+    const tag = document.createElement("script");
+    tag.src = "https://www.youtube.com/iframe_api";
+    const firstScriptTag = document.getElementsByTagName("script")[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
     return () => {
-      // Clean up script tag if it exists
-      if (player) {
-        player.destroy();
-        setPlayer(null);
-      }
-      // Clean up global variables
-      delete window.onYouTubeIframeAPIReady;
       delete window.youtubePlayer;
     };
   }, []);
 
-  useEffect(() => {
-    if (videoUrl) {
-      if (player) {
-        player.destroy();
-      }
-      const videoId = extractVideoId(videoUrl);
-      if (!videoId) return;
-
-      let timeoutId = null;
-
-      const initializePlayer = () => {
-        if (!window.YT || !window.YT.Player) {
-          timeoutId = setTimeout(initializePlayer, 100);
-          return;
-        }
-
-        try {
-          console.log("Creating new YouTube player...");
-          const newPlayer = new window.YT.Player("youtube-player", {
-            videoId: videoId,
-            width: "100%",
-            height: "100%",
-            playerVars: {
-              autoplay: 0,
-              controls: 1,
-              modestbranding: 1,
-            },
-            events: {
-              onReady: (event) => {
-                console.log("Player ready with video");
-                setPlayer(event.target);
-              },
-              onError: (error) => {
-                console.error("YouTube player error:", error);
-              }
-            }
-          });
-        } catch (error) {
-          console.error("Error creating YouTube player:", error);
-          timeoutId = setTimeout(initializePlayer, 100);
-        }
-      };
-
-      initializePlayer();
-
-      return () => {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-        }
-      };
+  const loadVideo = (videoId) => {
+    if (!window.YT) {
+      setTimeout(() => loadVideo(videoId), 100);
+      return;
     }
-  }, [videoUrl, player]);
+
+    if (player) {
+      player.loadVideoById(videoId);
+    } else {
+      new window.YT.Player("youtube-player", {
+        videoId: videoId,
+        width: "100%",
+        height: "100%",
+        playerVars: {
+          autoplay: 0,
+          controls: 1,
+          modestbranding: 1,
+        },
+        events: {
+          onReady: (event) => {
+            setPlayer(event.target);
+          },
+          onError: (error) => {
+            console.error("YouTube player error:", error);
+            setError("Error loading video");
+          }
+        }
+      });
+    }
+  };
 
   const handleVideoUrlChange = (e) => {
     const url = e.target.value;
     setVideoUrl(url);
     
-    if (player) {
-      player.destroy();
-    }
-    
     if (url) {
       const videoId = extractVideoId(url);
       if (videoId) {
-        const initializePlayer = () => {
-          if (!window.YT || !window.YT.Player) {
-            setTimeout(initializePlayer, 100);
-            return;
-          }
-
-          try {
-            console.log("Creating new YouTube player...");
-            const newPlayer = new window.YT.Player("youtube-player", {
-              videoId: videoId,
-              width: "100%",
-              height: "100%",
-              playerVars: {
-                autoplay: 0,
-                controls: 1,
-                modestbranding: 1,
-              },
-              events: {
-                onReady: (event) => {
-                  console.log("Player ready with video");
-                  setPlayer(event.target);
-                },
-                onError: (error) => {
-                  console.error("YouTube player error:", error);
-                }
-              }
-            });
-          } catch (error) {
-            console.error("Error creating YouTube player:", error);
-            setTimeout(initializePlayer, 100);
-          }
-        };
-
-        initializePlayer();
+        loadVideo(videoId);
       }
     }
   };
 
+  // Limpiar el reproductor cuando se desmonte el componente
   useEffect(() => {
     return () => {
       if (player) {
@@ -158,10 +85,16 @@ function App() {
 
   const extractVideoId = (url) => {
     const patterns = [
-      /(?:youtube\.com\/watch\?v=|youtu.be\/|youtube.com\/embed\/)([^&?]+)/,
+      /(?:youtube\.com\/watch\?v=|youtu.be\/|youtube.com\/embed\/)([^#&?]*)/,
     ];
-    const match = patterns.find((pattern) => pattern.test(url));
-    return match && match[1].length === 11 ? match[1] : null;
+    
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+    return null;
   };
 
   const handleDownload = async () => {
@@ -174,7 +107,6 @@ function App() {
       setStatusMessage("Iniciando descarga...");
       setLoading(true);
       setError(null);
-      setResult(null);
 
       const response = await axios.post(`${API_URL}/downloader/download/`, {
         url: videoUrl
